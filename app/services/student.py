@@ -45,6 +45,26 @@ class StudentService():
             if result is None:
                 raise BadRequest('Failed to insert new student')
             return result
+
+    def insert_many(self, items: list[dict]) -> list[dict]:
+        results = []
+        with db.session.begin():
+            for s in items:
+                need = {
+                    "name": s.get('name'),
+                    "email": s.get('email'),
+                    "phone": s.get('phone'),
+                    "address": s.get('address'),
+                    "genderId": s.get('gender_id'),
+                    "status": s.get('status')
+                    }
+                result = db.session.execute(
+                         self.insert_sql,
+                         need
+                         ).mappings().first()
+                results.append(result)
+            return results
+
     get_sql = text(
         '''select
         s.id,
@@ -144,3 +164,49 @@ class StudentService():
             )
             if row.rowcount != 1:
                 raise LookupError(f'Failed to delete student with id={id}')
+    get_id_sql = text(
+        '''select
+            s.id,
+            s.name,
+            s.email,
+            s.phone,
+            s.address,
+            s.status,
+            s.created_at,
+            g.name as "gender",
+            coalesce(
+            jsonb_agg(
+            jsonb_build_object(
+            'courseId',c.id,
+            'courseName',c.name,
+            'description',c.description,
+            'studentLimit',c.student_limit,
+            'currentStudents',c.current_students,
+            'courseStatus',c.status,
+            'startDate',c.start_date,
+            'endDate',c.end_date,
+            'createdAt',c.created_at
+            )
+            order by c.created_at desc
+            ) filter (where c.id is not null),
+            '[]'::jsonb
+            ) as courses
+            from student s
+            left join gender g on g.id = s.gender_id
+            left join student_course sc on sc.student_id = s.id
+            left join course c on c.id = sc.course_id
+            where s.id=:id
+            group by s.id,s.name,s.email,s.phone,s.address,s.status,
+            g.name
+        '''
+    )
+
+    def get_id(self, id: int) -> dict:
+        with db.session.begin():
+            result = db.session.execute(
+                self.get_id_sql,
+                {"id": id}
+            ).mappings().first()
+            if result is None:
+                raise NotFound(f'Student with id={id} Not found')
+            return result

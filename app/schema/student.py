@@ -1,6 +1,18 @@
 from marshmallow import Schema, fields, validate, pre_load, EXCLUDE
 
 
+def bulkSchema(nest_schema):
+    class BulkStudentSchema(Schema):
+        class Meta:
+            unknown = EXCLUDE
+        items = fields.List(
+            fields.Nested(nested=nest_schema),
+            required=True,
+            validate=validate.Length(min=1)
+        )
+    return BulkStudentSchema()
+
+
 class StudentSchema(Schema):
     class Meta:
         unknown = EXCLUDE

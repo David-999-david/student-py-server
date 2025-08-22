@@ -25,7 +25,7 @@ def register_app_error(app):
     def on_database(e):
         current_app.logger.exception(e)
         return jsonify(
-            error=f"DataBase Error , {str(e.description)}",
+            error="DataBase Error , ",
             detail=str(e)
         ), 500
 

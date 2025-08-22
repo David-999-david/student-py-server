@@ -16,13 +16,12 @@ class CourseSchema(Schema):
         required=True,
         validate=validate.Range(min=5)
     )
-    current_students = fields.Integer(
-        required=True,
-        validate=validate.Range(min=0)
-    )
     start_date = fields.DateTime(
     )
     end_date = fields.DateTime()
+    status = fields.Boolean(
+        required=True
+    )
 
     @pre_load
     def strip_normalize(self, data, **kwargs):

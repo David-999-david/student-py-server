@@ -4,7 +4,7 @@ from app.services.student import (
     StudentService
 )
 from app.seralizer import seralize_dict
-from app.schema.student import StudentSchema
+from app.schema.student import StudentSchema, bulkSchema
 
 gender_bp = Blueprint('gender', __name__, url_prefix='/gender')
 
@@ -25,18 +25,34 @@ def get():
 student_bp = Blueprint('student', __name__, url_prefix='/student')
 
 
+# @student_bp.route('', methods=['POST'])
+# def insert():
+#     payload = StudentSchema().load(
+#         request.get_json() or {}
+#     )
+#     result = StudentService().insert(payload)
+#     new_stud = seralize_dict(dict(result))
+#     return jsonify({
+#         "error": False,
+#         "success": True,
+#         "data": new_stud
+#     }), 201
+
+
 @student_bp.route('', methods=['POST'])
-def insert():
-    payload = StudentSchema().load(
+def insert_more():
+    payload = bulkSchema(StudentSchema).load(
         request.get_json() or {}
     )
-    result = StudentService().insert(payload)
-    new_stud = seralize_dict(dict(result))
+    results = StudentService().insert_many(payload['items'])
+    students = [
+        seralize_dict(dict(s)) for s in results
+    ]
     return jsonify({
         "error": False,
         "success": True,
-        "data": new_stud
-    }), 201
+        "data": students
+    })
 
 
 @student_bp.route('', methods=['GET'])
@@ -83,3 +99,14 @@ def remove(id):
         "success": True,
         "data": message
     }), 204
+
+
+@student_bp.route('/<int:id>', methods=['GET'])
+def get_id(id):
+    result = StudentService().get_id(id)
+    student = seralize_dict(dict(result))
+    return jsonify({
+        "error": False,
+        "success": True,
+        "data": student
+    }), 200
