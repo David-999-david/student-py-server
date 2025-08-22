@@ -55,25 +55,25 @@ def insert_more():
     })
 
 
-@student_bp.route('', methods=['GET'])
-def get_stu():
-    query = request.args.get('q', '').strip()
-    if query:
-        results = StudentService().get_query(query=query)
-        students = [
-            seralize_dict(dict(s)) for s in results
-        ]
-    else:
-        results = StudentService().get()
-        students = [
-            seralize_dict(dict(s)) for s in results
-        ]
-    return jsonify({
-        "error": False,
-        "success": True,
-        "data": students,
-        "count": len(students)
-    }), 200
+# @student_bp.route('', methods=['GET'])
+# def get_stu():
+#     query = request.args.get('q', '').strip()
+#     if query:
+#         results = StudentService().get_query(query=query)
+#         students = [
+#             seralize_dict(dict(s)) for s in results
+#         ]
+#     else:
+#         results = StudentService().get()
+#         students = [
+#             seralize_dict(dict(s)) for s in results
+#         ]
+#     return jsonify({
+#         "error": False,
+#         "success": True,
+#         "data": students,
+#         "count": len(students)
+#     }), 200
 
 
 @student_bp.route('/<int:id>', methods=['PUT'])
@@ -92,7 +92,11 @@ def edit_stu(id):
 
 @student_bp.route('/<int:id>', methods=['DELETE'])
 def remove(id):
-    StudentService().remove(id)
+    data = request.get_json()
+    courseIds = data.get('courseIds') or []
+    if not isinstance(courseIds, list):
+        raise LookupError('For delete student, courseIds is not list')
+    StudentService().remove(id, courseIds=courseIds)
     message = f'Delete student with id={id} success'
     return jsonify({
         "error": False,
@@ -101,12 +105,31 @@ def remove(id):
     }), 204
 
 
+@student_bp.route('/', defaults={"id": None}, methods=['GET'])
 @student_bp.route('/<int:id>', methods=['GET'])
 def get_id(id):
-    result = StudentService().get_id(id)
-    student = seralize_dict(dict(result))
+    query = request.args.get('q', '').strip()
+    if id:
+        results = StudentService().get_id(id)
+        students = seralize_dict(dict(results))
+        return jsonify({
+            "error": False,
+            "success": True,
+            "data": students,
+        }), 200
+    elif query:
+        results = StudentService().get_join_query(query=query)
+        students = [
+            seralize_dict(dict(s)) for s in results
+        ]
+    else:
+        results = StudentService().get_join()
+        students = [
+            seralize_dict(dict(s)) for s in results
+        ]
     return jsonify({
         "error": False,
         "success": True,
-        "data": student
+        "data": students,
+        "count": len(students)
     }), 200

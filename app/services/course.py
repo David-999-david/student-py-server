@@ -155,6 +155,7 @@ class CourseService():
             where c.id = :id
             group by c.id,c.name,c.status,c.student_limit,c.current_students,
             c.start_date,c.end_date,c.created_at
+            order by c.created_at desc
         '''
     )
 
