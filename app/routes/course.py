@@ -8,18 +8,18 @@ from app.schema.student import bulkSchema
 course_bp = Blueprint('course', __name__, url_prefix='/course')
 
 
-# @course_bp.route('', methods=['POST'])
-# def insert():
-#     payload = CourseSchema().load(
-#         request.get_json() or {}
-#     )
-#     result = CourseService().insert(payload)
-#     course = seralize_dict(dict(result))
-#     return jsonify({
-#         "error": False,
-#         "success": True,
-#         "data": course
-#     }), 201
+@course_bp.route('', methods=['POST'])
+def insert():
+    payload = CourseSchema().load(
+        request.get_json() or {}
+    )
+    result = CourseService().insert(payload)
+    course = seralize_dict(dict(result))
+    return jsonify({
+        "error": False,
+        "success": True,
+        "data": course
+    }), 201
 
 
 @course_bp.route('', methods=['POST'])
@@ -35,7 +35,7 @@ def insert_more():
         "error": False,
         "success": True,
         "data": courses
-    })
+    }), 201
 
 
 @course_bp.route('', methods=['GET'])
@@ -56,7 +56,7 @@ def get():
         "success": True,
         "data": courses,
         "count": len(courses)
-    })
+    }), 200
 
 
 @course_bp.route('/<int:id>', methods=['PUT'])
@@ -80,7 +80,7 @@ def delete(id):
         "error": False,
         "success": True,
         "message": f"Delete course with id={id} success"
-    })
+    }), 200
 
 
 @course_bp.route('/<int:id>', methods=['GET'])
@@ -99,12 +99,13 @@ def join():
     data = request.get_json()
     courseId = data.get('courseId')
     studentIds = data.get('studentIds')
-    CourseService().join(courseId=courseId, studentIds=studentIds)
+    response = CourseService().join(courseId=courseId, studentIds=studentIds)
     message = f"Join course with id{courseId} and students success"
     return jsonify({
         "error": False,
         "success": True,
-        "message": message
+        "message": message,
+        "response": response
     }), 201
 
 
@@ -120,4 +121,4 @@ def cancel_join():
         "error": False,
         "success": True,
         "data": message
-    }), 203
+    }), 200

@@ -19,24 +19,24 @@ def get():
         "error": False,
         "success": True,
         "data": genders
-    })
+    }), 200
 
 
 student_bp = Blueprint('student', __name__, url_prefix='/student')
 
 
-# @student_bp.route('', methods=['POST'])
-# def insert():
-#     payload = StudentSchema().load(
-#         request.get_json() or {}
-#     )
-#     result = StudentService().insert(payload)
-#     new_stud = seralize_dict(dict(result))
-#     return jsonify({
-#         "error": False,
-#         "success": True,
-#         "data": new_stud
-#     }), 201
+@student_bp.route('', methods=['POST'])
+def insert():
+    payload = StudentSchema().load(
+        request.get_json() or {}
+    )
+    result = StudentService().insert(payload)
+    new_stud = seralize_dict(dict(result))
+    return jsonify({
+        "error": False,
+        "success": True,
+        "data": new_stud
+    }), 201
 
 
 @student_bp.route('', methods=['POST'])
@@ -52,7 +52,7 @@ def insert_more():
         "error": False,
         "success": True,
         "data": students
-    })
+    }), 201
 
 
 # @student_bp.route('', methods=['GET'])
@@ -102,10 +102,10 @@ def remove(id):
         "error": False,
         "success": True,
         "data": message
-    }), 204
+    }), 200
 
 
-@student_bp.route('/', defaults={"id": None}, methods=['GET'])
+@student_bp.route('', defaults={"id": None}, methods=['GET'])
 @student_bp.route('/<int:id>', methods=['GET'])
 def get_id(id):
     query = request.args.get('q', '').strip()
@@ -132,4 +132,33 @@ def get_id(id):
         "success": True,
         "data": students,
         "count": len(students)
+    }), 200
+
+
+@student_bp.route('/join', methods=['POST'])
+def join():
+    data = request.get_json()
+    studentId = data.get('studentId')
+    courseIds = data.get('courseIds')
+    res = StudentService().make_join(studentId=studentId, courseIds=courseIds)
+    message = 'Join student with courses success'
+    return jsonify({
+        "error": False,
+        "success": True,
+        "message": message,
+        "detail": res
+    }), 200
+
+
+@student_bp.route('/join', methods=['DELETE'])
+def cancel_join():
+    data = request.get_json()
+    studentId = data.get('studentId')
+    courseId = data.get('courseId')
+    StudentService().cancel_join(studentId, courseId)
+    message = 'Cancel join student with course success'
+    return jsonify({
+        "error": False,
+        "success": True,
+        "message": message
     }), 200

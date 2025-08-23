@@ -317,3 +317,134 @@ class StudentService():
             if result is None:
                 raise NotFound('Students Not found')
             return result
+    join_check = text(
+        '''select 1 from student_course
+            where student_id=:studentId
+            and course_id=:courseId
+        '''
+    )
+    check_limit = text(
+        '''select 1 from course
+            where id = :courseId
+            and current_students < student_limit
+        '''
+    )
+    join_sql = text(
+        '''insert into student_course
+            (student_id,course_id)
+            select :studentId, unnest(:courseIds)
+            on conflict do nothing
+            returning course_id
+        '''
+    )
+    count_sql = text(
+        '''update course
+            set current_students = current_students + 1,
+            updated_at = now()
+            where id=any(:courseIds)
+            returning id
+        '''
+    )
+
+    def make_join(self, studentId: int, courseIds: list[int]):
+        valid_courseIds: list[int] = []
+        invalid_courseIds: list[int] = []
+        with db.session.begin():
+            for id in courseIds:
+                check = db.session.execute(
+                    self.join_check,
+                    {
+                        "studentId": studentId,
+                        "courseId": id
+                    }
+                ).scalar()
+                if check:
+                    continue
+                check_limit = db.session.execute(
+                    self.check_limit,
+                    {
+                        "courseId": id
+                    }
+                ).scalar()
+                if check_limit:
+                    valid_courseIds.append(id)
+                else:
+                    invalid_courseIds.append(id)
+            if not valid_courseIds:
+                return {
+                    "detail": "There is no valid course for join with student"
+                }
+            join = db.session.execute(
+                self.join_sql,
+                {
+                 "studentId": studentId,
+                 "courseIds": valid_courseIds
+                 }
+            ).scalars().all()
+            if join:
+                db.session.execute(
+                    self.count_sql,
+                    {
+                        "studentId": studentId,
+                        "courseIds": valid_courseIds
+                    }
+                    ).scalars().all()
+            request = list(dict.fromkeys(courseIds))
+            joined = join
+            valid = valid_courseIds
+            invalid = invalid_courseIds
+            return {
+                "request": request,
+                "joined": joined,
+                "valid": valid,
+                "invalid": invalid
+            }
+    dec_count = text(
+        '''update course set
+            current_students = GREATEST(current_students - 1,0),
+            updated_at = now()
+            where id = :courseId
+            returning 1
+        '''
+    )
+    cancel_sql = text(
+        '''delete from student_course
+            where student_id=:studentId
+            and course_id=:courseId
+            returning 1
+        '''
+    )
+
+    def cancel_join(self, studId: int, couId: int):
+        with db.session.begin():
+            need = {
+                "studentId": studId,
+                "courseId": couId
+            }
+            check = db.session.execute(
+                self.join_check,
+                need
+            )
+            if check is None:
+                raise NotFound(
+                    f'Not found the course id={couId}'
+                    f'With join of student id={studId}'
+                )
+            cancel = db.session.execute(
+                self.cancel_sql,
+                need
+            ).scalar()
+            if cancel is None:
+                raise LookupError(
+                    f'Failed to delete the course id={couId}'
+                    f'With join of student id={studId}'
+                )
+            dec = db.session.execute(
+                self.dec_count,
+                {"courseId": couId}
+            ).scalar()
+            if dec is None:
+                raise LookupError(
+                    f'Failed to decrease the current students of'
+                    f'course with id={couId}'
+                )

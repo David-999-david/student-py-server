@@ -168,94 +168,179 @@ class CourseService():
             if result is None:
                 raise NotFound(f'Course with id={id} not found')
             return result
-    check_limit = text(
-        '''select student_limit,current_students,status
-            from course where id=:courseId
+    # check_limit = text(
+    #     '''select student_limit,current_students,status
+    #         from course where id=:courseId
+    #     '''
+    # )
+    # check_join = text(
+    #     '''select 1 from student_course
+    #         where student_id = :studentId
+    #         and course_id= :courseId
+    #     '''
+    # )
+    # join_sql = text(
+    #     '''insert into student_course
+    #         (student_id,course_id)
+    #         values
+    #         (:studentId, :courseId)
+    #         on conflict(student_id,course_id)
+    #         do nothing
+    #         returning 1
+    #     '''
+    # )
+    # plus_student = text(
+    #     '''update course
+    #         set current_students =current_students + :n
+    #         where id=:courseId
+    #         returning current_students
+    #     '''
+    # )
+    # stud_status_sql = text(
+    #     '''select status
+    #         from student
+    #         where id=:id
+    #     '''
+    # )
+
+    # def join(self, courseId: int, studentIds: list[int]):
+    #     count = 0
+    #     with db.session.begin():
+    #         limit_check = db.session.execute(
+    #                 self.check_limit,
+    #                 {"courseId": courseId}
+    #                 ).mappings().fetchone()
+    #         if limit_check is None:
+    #             raise LookupError(f'Course with id{courseId} not found')
+    #         limit = limit_check['student_limit']
+    #         current = limit_check['current_students']
+    #         status = limit_check['status']
+    #         if current >= limit:
+    #             raise LookupError(f'The course with id={courseId}'
+    #                               'limit had reach')
+    #         if not status:
+    #             raise LookupError('The course status is false')
+    #         for id in studentIds:
+    #             status_check = db.session.execute(
+    #                 self.stud_status_sql,
+    #                 {"id": id}
+    #             ).mappings().fetchone()
+    #             stud_status = status_check['status']
+    #             if not stud_status:
+    #                 continue
+    #             if not status:
+    #                 break
+    #             if current >= limit:
+    #                 break
+    #             need = {
+    #                 "studentId": id,
+    #                 "courseId": courseId
+    #             }
+    #             check = db.session.execute(
+    #                 self.check_join,
+    #                 need
+    #             ).fetchone()
+    #             if check is not None:
+    #                 continue
+    #             join_row = db.session.execute(
+    #                 self.join_sql,
+    #                 need
+    #             ).fetchone()
+    #             if join_row is not None:
+    #                 count += 1
+    #         after = db.session.execute(
+    #             self.plus_student,
+    #             {
+    #                 "courseId": courseId,
+    #                 "n": count
+    #             }
+    #         ).fetchone()
+    #         if after is None:
+    #             raise RuntimeError('Failed to refresh '
+    #                                'the newest student count')
+    exist_sql = text(
+        '''select 1 from student_course
+        where student_id = :sid
+        and course_id = :cid
         '''
     )
-    check_join = text(
-        '''select 1 from student_course
-            where student_id = :studentId
-            and course_id= :courseId
+    stud_status = text(
+        '''select status
+        from student where id=:sid
+        '''
+    )
+    limit_sql = text(
+        '''select student_limit,current_students
+            from course where id=:cid
+            for update
         '''
     )
     join_sql = text(
         '''insert into student_course
-            (student_id,course_id)
-            values
-            (:studentId, :courseId)
-            on conflict(student_id,course_id)
-            do nothing
-            returning 1
+        (student_id,course_id)
+        values
+        (:sid,:cid)
+        on conflict (student_id,course_id) do nothing
+        returning 1
         '''
     )
-    plus_student = text(
-        '''update course
-            set current_students =current_students + :n
-            where id=:courseId
-            returning current_students
-        '''
-    )
-    stud_status_sql = text(
-        '''select status
-            from student
-            where id=:id
+    inc_sql = text(
+        '''update course set
+        current_students = LEAST(student_limit, current_students + :n),
+        updated_at = now()
+        where id=:cid
+        returning current_students
         '''
     )
 
     def join(self, courseId: int, studentIds: list[int]):
-        count = 0
+        count: int = 0
         with db.session.begin():
-            limit_check = db.session.execute(
-                    self.check_limit,
-                    {"courseId": courseId}
-                    ).mappings().fetchone()
-            if limit_check is None:
-                raise LookupError(f'Course with id{courseId} not found')
-            limit = limit_check['student_limit']
-            current = limit_check['current_students']
-            status = limit_check['status']
-            if current >= limit:
-                raise LookupError(f'The course with id={courseId}'
-                                  'limit had reach')
-            for id in studentIds:
-                status_check = db.session.execute(
-                    self.stud_status_sql,
-                    {"id": id}
+            for sid in studentIds:
+                check_limit = db.session.execute(
+                    self.limit_sql,
+                    {"cid": courseId}
                 ).mappings().fetchone()
-                stud_status = status_check['status']
-                if not stud_status:
-                    continue
-                if not status:
-                    break
+                limit = check_limit['student_limit']
+                current = check_limit['current_students']
                 if current >= limit:
                     break
-                need = {
-                    "studentId": id,
-                    "courseId": courseId
-                }
-                check = db.session.execute(
-                    self.check_join,
-                    need
-                ).fetchone()
-                if check is not None:
+                exist = db.session.execute(
+                    self.exist_sql,
+                    {
+                        "sid": sid,
+                        "cid": courseId
+                    }
+                ).scalar()
+                if exist is not None:
                     continue
-                join_row = db.session.execute(
+                stu_status = db.session.execute(
+                    self.stud_status,
+                    {"sid": sid}
+                ).scalar()
+                if not stu_status:
+                    continue
+                join = db.session.execute(
                     self.join_sql,
-                    need
-                ).fetchone()
-                if join_row is not None:
+                    {
+                        "sid": sid,
+                        "cid": courseId
+                    }
+                ).scalar()
+                if join:
                     count += 1
-            after = db.session.execute(
-                self.plus_student,
-                {
-                    "courseId": courseId,
-                    "n": count
-                }
-            ).fetchone()
-            if after is None:
-                raise RuntimeError('Failed to refresh '
-                                   'the newest student count')
+                    current += 1
+            if count > 0:
+                db.session.execute(
+                    self.inc_sql,
+                    {
+                        "n": count,
+                        "cid": courseId
+                    }
+                )
+                return {"detial": f'{count} Students are join'
+                        f'Course with id={courseId}'}
+
     check_sql = text(
         '''select 1 from
             student_course
