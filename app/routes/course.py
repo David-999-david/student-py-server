@@ -100,12 +100,17 @@ def join():
     courseId = data.get('courseId')
     studentIds = data.get('studentIds')
     response = CourseService().join(courseId=courseId, studentIds=studentIds)
-    message = f"Join course with id{courseId} and students success"
+    if response.get('error'):
+        return jsonify({
+            "error": True,
+            "success": False,
+            "detial": response["detail"]
+        }), response['status']
     return jsonify({
         "error": False,
         "success": True,
-        "message": message,
-        "response": response
+        "message": response['message'],
+        "data": response['data']
     }), 201
 
 
@@ -114,11 +119,14 @@ def cancel_join():
     data = request.get_json()
     courseId = data.get('courseId')
     studentId = data.get('studentId')
-    CourseService().cancel_join(courseId=courseId, studentId=studentId)
-    message = f'Cancel join course id={courseId} with student id={studentId}' \
-              'success'
+    result = CourseService().cancel_join(courseId=courseId, studentId=studentId)
+    if result.get('error'):
+        return jsonify({
+            "error": True,
+            "detial": result['detial']
+        }), result['status']
     return jsonify({
         "error": False,
         "success": True,
-        "data": message
-    }), 200
+        "data": result['detail']
+    }), result['status']

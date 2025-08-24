@@ -140,14 +140,18 @@ def join():
     data = request.get_json()
     studentId = data.get('studentId')
     courseIds = data.get('courseIds')
-    res = StudentService().make_join(studentId=studentId, courseIds=courseIds)
-    message = 'Join student with courses success'
+    result = StudentService().make_join(studentId=studentId, courseIds=courseIds)
+    if result.get('error'):
+        return jsonify({
+            "error": True,
+            "detail": result['detail']
+        }), result['status']
     return jsonify({
         "error": False,
         "success": True,
-        "message": message,
-        "detail": res
-    }), 200
+        "message": result['message'],
+        "data": result['data']
+    }), result['status']
 
 
 @student_bp.route('/join', methods=['DELETE'])
@@ -155,10 +159,32 @@ def cancel_join():
     data = request.get_json()
     studentId = data.get('studentId')
     courseId = data.get('courseId')
-    StudentService().cancel_join(studentId, courseId)
-    message = 'Cancel join student with course success'
+    result = StudentService().cancel_join(studentId, courseId)
+    if result.get('error'):
+        return jsonify({
+            "error": True,
+            "detail": result['detail']
+        }), result['status']
     return jsonify({
         "error": False,
         "success": True,
-        "message": message
-    }), 200
+        "message": result['detail']
+    }), result['status']
+
+
+@student_bp.route('/detail', methods=['GET'])
+def detial():
+    result = StudentService().detial()
+    return jsonify({
+        "error": False,
+        "success": True,
+        "data": {
+            "s_s_t": result['s_s_t'],
+            "s_s_f": result['s_s_f'],
+            "s_g_m": result['s_g_m'],
+            's_g_f': result['s_g_f'],
+            's_g_o': result['s_g_o'],
+            "c_s_t": result['c_s_t'],
+            "c_s_f": result['c_s_f']
+        }
+    })

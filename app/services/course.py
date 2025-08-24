@@ -270,7 +270,7 @@ class CourseService():
         '''
     )
     limit_sql = text(
-        '''select student_limit,current_students
+        '''select student_limit,current_students,status
             from course where id=:cid
             for update
         '''
@@ -294,6 +294,11 @@ class CourseService():
     )
 
     def join(self, courseId: int, studentIds: list[int]):
+        result = {
+            "skip": [],
+            "join": [],
+            "course_Full": False
+        }
         count: int = 0
         with db.session.begin():
             for sid in studentIds:
@@ -303,8 +308,22 @@ class CourseService():
                 ).mappings().fetchone()
                 limit = check_limit['student_limit']
                 current = check_limit['current_students']
+                cour_status = check_limit['status']
+                if not cour_status:
+                    return {
+                        "error": True,
+                        "status": 403,
+                        "detail": f'Course with id={courseId}'
+                                  ' status Inactive'
+                    }
                 if current >= limit:
-                    break
+                    result["course_Full"] = True
+                    return {
+                        "error": False,
+                        "status": 200,
+                        "message": f'Course id={courseId} limit reach',
+                        "data": result
+                    }
                 exist = db.session.execute(
                     self.exist_sql,
                     {
@@ -313,12 +332,24 @@ class CourseService():
                     }
                 ).scalar()
                 if exist is not None:
+                    result['skip'].append(
+                        {"sid": sid,
+                         "reason": f"Sid {sid} already join with Cid"
+                         f"{courseId}"
+                         }
+                    )
                     continue
                 stu_status = db.session.execute(
                     self.stud_status,
                     {"sid": sid}
                 ).scalar()
                 if not stu_status:
+                    result["skip"].append(
+                        {
+                            "sid": sid,
+                            "reason": f"Sid {sid} is Inactive"
+                        }
+                    )
                     continue
                 join = db.session.execute(
                     self.join_sql,
@@ -330,6 +361,12 @@ class CourseService():
                 if join:
                     count += 1
                     current += 1
+                    result['join'].append(
+                        {
+                            "sid": sid,
+                            "reason": f'Sid {sid} joined'
+                        }
+                    )
             if count > 0:
                 db.session.execute(
                     self.inc_sql,
@@ -338,8 +375,7 @@ class CourseService():
                         "cid": courseId
                     }
                 )
-                return {"detial": f'{count} Students are join'
-                        f'Course with id={courseId}'}
+            return {"error": False, "status": 200, "message": f'Students success join with course id={courseId}', "data": result}
 
     check_sql = text(
         '''select 1 from
@@ -351,7 +387,7 @@ class CourseService():
     current_sql = text(
         '''update course
             set
-            current_students = current_students - 1,
+            current_students = greatest(current_students - 1,0),
             updated_at = now()
             where id = :id
             returning 1
@@ -376,10 +412,12 @@ class CourseService():
                 need
             ).scalar()
             if check is None:
-                raise NotFound(
-                    f'Not found the course id={courseId}'
+                return {
+                    "error": True,
+                    "status": 404,
+                    "detial": f'Not found the course id={courseId}'
                     f'With join of student id={studentId}'
-                )
+                }
             cancel = db.session.execute(
                 self.cancel_join_sql,
                 need
@@ -400,3 +438,9 @@ class CourseService():
                     f'Failed to decrease the current students of'
                     f'course with id={courseId}'
                 )
+            return {
+                "error": False,
+                "status": 200,
+                "detail": f'Cancel join course id={courseId} with student id={studentId}'
+                          'success'
+            }

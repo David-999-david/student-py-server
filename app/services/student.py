@@ -317,6 +317,11 @@ class StudentService():
             if result is None:
                 raise NotFound('Students Not found')
             return result
+    status_sql = text(
+        '''select status from student
+            where id=:id
+        '''
+    )
     join_check = text(
         '''select 1 from student_course
             where student_id=:studentId
@@ -326,6 +331,7 @@ class StudentService():
     check_limit = text(
         '''select 1 from course
             where id = :courseId
+            and status = true
             and current_students < student_limit
         '''
     )
@@ -348,8 +354,23 @@ class StudentService():
 
     def make_join(self, studentId: int, courseIds: list[int]):
         valid_courseIds: list[int] = []
-        invalid_courseIds: list[int] = []
+        result = {
+            "join": [],
+            "skip": [],
+            "valid_course": [],
+            "course_full": False
+        }
         with db.session.begin():
+            status = db.session.execute(
+                self.status_sql,
+                {"id": studentId}
+            ).scalar()
+            if not status:
+                return {
+                    "error": True,
+                    "status": 403,
+                    "detial": f"Sid {studentId} is Inactive"
+                }
             for id in courseIds:
                 check = db.session.execute(
                     self.join_check,
@@ -359,6 +380,13 @@ class StudentService():
                     }
                 ).scalar()
                 if check:
+                    result["skip"].append(
+                        {
+                            "sid": studentId,
+                            "cid": id,
+                            "reason": f"Sid {studentId} already join with cid {id}"
+                        }
+                    )
                     continue
                 check_limit = db.session.execute(
                     self.check_limit,
@@ -368,11 +396,30 @@ class StudentService():
                 ).scalar()
                 if check_limit:
                     valid_courseIds.append(id)
+                    result["join"].append(
+                        {
+                            "cid": id,
+                            "reason": f'Course {id} status active'
+                        }
+                    )
+                    result['valid_course'].append(
+                        {
+                            "cid": id
+                        }
+                    )
                 else:
-                    invalid_courseIds.append(id)
+                    result['skip'].append(
+                        {
+                            "cid": id,
+                            "reason": f'Cid {id} is inactive or reach limit'
+                        }
+                    )
             if not valid_courseIds:
                 return {
-                    "detail": "There is no valid course for join with student"
+                    "error": False,
+                    "status": 200,
+                    "message": "There is no valid course for join with student",
+                    "data": result
                 }
             join = db.session.execute(
                 self.join_sql,
@@ -385,19 +432,14 @@ class StudentService():
                 db.session.execute(
                     self.count_sql,
                     {
-                        "studentId": studentId,
                         "courseIds": valid_courseIds
                     }
                     ).scalars().all()
-            request = list(dict.fromkeys(courseIds))
-            joined = join
-            valid = valid_courseIds
-            invalid = invalid_courseIds
             return {
-                "request": request,
-                "joined": joined,
-                "valid": valid,
-                "invalid": invalid
+                "error": False,
+                "status": 201,
+                "message": f"Courses success join with sid {studentId}",
+                "data": result
             }
     dec_count = text(
         '''update course set
@@ -424,12 +466,14 @@ class StudentService():
             check = db.session.execute(
                 self.join_check,
                 need
-            )
+            ).scalar()
             if check is None:
-                raise NotFound(
-                    f'Not found the course id={couId}'
+                return {
+                    "error": True,
+                    "status": 404,
+                    "detail": f'Not found the course id={couId}'
                     f'With join of student id={studId}'
-                )
+                }
             cancel = db.session.execute(
                 self.cancel_sql,
                 need
@@ -448,3 +492,63 @@ class StudentService():
                     f'Failed to decrease the current students of'
                     f'course with id={couId}'
                 )
+            return {
+                "error": False,
+                "status": 200,
+                "detail": 'Cancel join student with course success'
+            }
+    s_s_sql = text(
+        '''select count(*) from student
+            where status = :status
+        '''
+    )
+    c_c_sql = text(
+        '''select count(*) from course
+            where status = :status
+        '''
+    )
+    s_g_sql = text(
+        '''select count(*) from student
+            where gender_id = :n
+        '''
+    )
+
+    def detial(self):
+        with db.session.begin():
+            s_s_t = db.session.execute(
+                self.s_s_sql,
+                {"status": True}
+            ).scalar()
+            s_s_f = db.session.execute(
+                self.s_s_sql,
+                {"status": False}
+            ).scalar()
+            s_g_m = db.session.execute(
+                self.s_g_sql,
+                {"n": 1}
+            ).scalar()
+            s_g_f = db.session.execute(
+                self.s_g_sql,
+                {"n": 2}
+            ).scalar()
+            s_g_o = db.session.execute(
+                self.s_g_sql,
+                {"n": 3}
+            ).scalar()
+            c_s_t = db.session.execute(
+                self.c_c_sql,
+                {"status": True}
+            ).scalar()
+            c_s_f = db.session.execute(
+                self.c_c_sql,
+                {"status": False}
+            ).scalar()
+            return {
+                "s_s_t": s_s_t,
+                "s_s_f": s_s_f,
+                "s_g_m": s_g_m,
+                "s_g_f": s_g_f,
+                "s_g_o": s_g_o,
+                "c_s_t": c_s_t,
+                "c_s_f": c_s_f
+            }
