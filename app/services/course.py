@@ -297,33 +297,37 @@ class CourseService():
         result = {
             "skip": [],
             "join": [],
-            "course_Full": False
+            "course_full": False
         }
-        count: int = 0
         with db.session.begin():
+            check = db.session.execute(
+                self.limit_sql,
+                {"cid": courseId}
+            ).mappings().fetchone()
+            if check is None:
+                return {
+                    "error": True,
+                    "status": 404,
+                    "detial": f"Course {courseId} not found"
+                }
+            if not check['status']:
+                return {
+                    "error": True,
+                    "status": 403,
+                    "detail": f"Course {courseId} is Inactive"
+                }
+            remaining = check['student_limit'] - check['current_students']
+            if remaining <= 0:
+                result['course_full'] = True
+                return {
+                    "error": False,
+                    "status": 403,
+                    "data": result
+                }
             for sid in studentIds:
-                check_limit = db.session.execute(
-                    self.limit_sql,
-                    {"cid": courseId}
-                ).mappings().fetchone()
-                limit = check_limit['student_limit']
-                current = check_limit['current_students']
-                cour_status = check_limit['status']
-                if not cour_status:
-                    return {
-                        "error": True,
-                        "status": 403,
-                        "detail": f'Course with id={courseId}'
-                                  ' status Inactive'
-                    }
-                if current >= limit:
-                    result["course_Full"] = True
-                    return {
-                        "error": False,
-                        "status": 200,
-                        "message": f'Course id={courseId} limit reach',
-                        "data": result
-                    }
+                if remaining == 0:
+                    result['course_full'] = True
+                    break
                 exist = db.session.execute(
                     self.exist_sql,
                     {
@@ -359,23 +363,108 @@ class CourseService():
                     }
                 ).scalar()
                 if join:
-                    count += 1
-                    current += 1
+                    updated = db.session.execute(
+                        self.inc_sql,
+                        {
+                            "n": 1,
+                            "cid": courseId
+                        }
+                    ).scalar()
+                    if updated is None:
+                        result['course_full'] = True
+                        break
+                    remaining -= 1
                     result['join'].append(
                         {
                             "sid": sid,
-                            "reason": f'Sid {sid} joined'
+                            "reason": f"Student {sid} Joined with Course {courseId}"
                         }
                     )
-            if count > 0:
-                db.session.execute(
-                    self.inc_sql,
-                    {
-                        "n": count,
-                        "cid": courseId
-                    }
-                )
-            return {"error": False, "status": 200, "data": result}
+            return {
+                "error": False,
+                "status": 201,
+                "data": result
+            }
+
+    # def joins(self, courseId: int, studentIds: list[int]):
+    #     result = {
+    #         "skip": [],
+    #         "join": [],
+    #         "course_Full": False
+    #     }
+    #     with db.session.begin():
+    #         for sid in studentIds:
+    #             check_limit = db.session.execute(
+    #                 self.limit_sql,
+    #                 {"cid": courseId}
+    #             ).mappings().fetchone()
+    #             limit = check_limit['student_limit']
+    #             current = check_limit['current_students']
+    #             cour_status = check_limit['status']
+    #             if not cour_status:
+    #                 return {
+    #                     "error": True,
+    #                     "status": 403,
+    #                     "detail": f'Course with id={courseId}'
+    #                               ' status Inactive'
+    #                 }
+    #             if current >= limit:
+    #                 result["course_Full"] = True
+    #                 return {
+    #                     "error": False,
+    #                     "status": 200,
+    #                     "message": f'Course id={courseId} limit reach',
+    #                     "data": result
+    #                 }
+    #             exist = db.session.execute(
+    #                 self.exist_sql,
+    #                 {
+    #                     "sid": sid,
+    #                     "cid": courseId
+    #                 }
+    #             ).scalar()
+    #             if exist is not None:
+    #                 result['skip'].append(
+    #                     {"sid": sid,
+    #                      "reason": f"Sid {sid} already join with Cid"
+    #                      f"{courseId}"
+    #                      }
+    #                 )
+    #                 continue
+    #             stu_status = db.session.execute(
+    #                 self.stud_status,
+    #                 {"sid": sid}
+    #             ).scalar()
+    #             if not stu_status:
+    #                 result["skip"].append(
+    #                     {
+    #                         "sid": sid,
+    #                         "reason": f"Sid {sid} is Inactive"
+    #                     }
+    #                 )
+    #                 continue
+    #             join = db.session.execute(
+    #                 self.join_sql,
+    #                 {
+    #                     "sid": sid,
+    #                     "cid": courseId
+    #                 }
+    #             ).scalar()
+    #             if join:
+    #                 result['join'].append(
+    #                     {
+    #                         "sid": sid,
+    #                         "reason": f'Sid {sid} joined'
+    #                     }
+    #                 )
+    #                 db.session.execute(
+    #                     self.inc_sql,
+    #                     {
+    #                         "n": 1,
+    #                         "cid": courseId
+    #                     }
+    #                 )
+    #         return {"error": False, "status": 200, "data": result}
 
     check_sql = text(
         '''select 1 from
