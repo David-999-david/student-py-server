@@ -173,8 +173,8 @@ def cancel_join():
 
 
 @student_bp.route('/detail', methods=['GET'])
-def detial():
-    result = StudentService().detial()
+def detail():
+    result = StudentService().detail()
     return jsonify({
         "error": False,
         "success": True,

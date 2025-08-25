@@ -369,7 +369,7 @@ class StudentService():
                 return {
                     "error": True,
                     "status": 403,
-                    "detial": f"Sid {studentId} is Inactive"
+                    "detail": f"Sid {studentId} is Inactive"
                 }
             for id in courseIds:
                 check = db.session.execute(
@@ -513,7 +513,7 @@ class StudentService():
         '''
     )
 
-    def detial(self):
+    def detail(self):
         with db.session.begin():
             s_s_t = db.session.execute(
                 self.s_s_sql,

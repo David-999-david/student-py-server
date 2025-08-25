@@ -14,22 +14,20 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 @auth_bp.route('/login', methods=['POST'])
 def login():
     payload = LoginSchema().load(request.get_json())
-    token = auth_service().login(payload)
+    result = auth_service().login(payload)
 
-    if not token:
+    if result.get('error'):
         return jsonify({
             "error": True,
-            "message": "Email or password is incorrect"
-        }), 400
-
-    access, refresh = token
+            "detail": result['detail']
+        }), result['status']
     return jsonify({
         "error": False,
         "success": True,
         "data": "Login in success",
-        "access": access,
-        "refresh": refresh
-    }), 200
+        "access": result['access'],
+        "refresh": result['refresh']
+    }), result['status']
 
 
 @auth_bp.route('/refresh', methods=['POST'])

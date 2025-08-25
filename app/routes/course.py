@@ -104,12 +104,11 @@ def join():
         return jsonify({
             "error": True,
             "success": False,
-            "detial": response["detail"]
+            "detail": response["detail"]
         }), response['status']
     return jsonify({
         "error": False,
         "success": True,
-        "message": response['message'],
         "data": response['data']
     }), 201
 
@@ -123,7 +122,7 @@ def cancel_join():
     if result.get('error'):
         return jsonify({
             "error": True,
-            "detial": result['detial']
+            "detail": result['detail']
         }), result['status']
     return jsonify({
         "error": False,

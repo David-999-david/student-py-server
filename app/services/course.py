@@ -375,7 +375,7 @@ class CourseService():
                         "cid": courseId
                     }
                 )
-            return {"error": False, "status": 200, "message": f'Students success join with course id={courseId}', "data": result}
+            return {"error": False, "status": 200, "data": result}
 
     check_sql = text(
         '''select 1 from
@@ -415,7 +415,7 @@ class CourseService():
                 return {
                     "error": True,
                     "status": 404,
-                    "detial": f'Not found the course id={courseId}'
+                    "detail": f'Not found the course id={courseId}'
                     f'With join of student id={studentId}'
                 }
             cancel = db.session.execute(
