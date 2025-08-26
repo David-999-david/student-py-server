@@ -78,6 +78,7 @@ class StudentService():
         from student s
         left join gender g on g.id = s.gender_id
         order by s.created_at desc
+        limit :limit offset :offset
         '''
     )
 
@@ -98,21 +99,30 @@ class StudentService():
         or s.phone ilike :query
         or g.name ilike :query
         order by s.created_at desc
+        limit :limit offset :offset
         '''
     )
 
-    def get(self) -> list[dict]:
+    def get(self, limit: int, offset: int) -> list[dict]:
         with db.session.begin():
             results = db.session.execute(
-                self.get_sql
+                self.get_sql,
+                {
+                    "limit": limit,
+                    "offset": offset
+                }
             ).mappings().fetchall()
             return results
 
-    def get_query(self, query: str) -> list[dict]:
+    def get_query(self, query: str, limit: int, offset: int) -> list[dict]:
         with db.session.begin():
             results = db.session.execute(
                 self.get_query_sql,
-                {"query": f'%{query}%'}
+                {
+                    "query": f'%{query}%',
+                    "limit": limit,
+                    "offset": offset
+                    }
             ).mappings().fetchall()
             return results
 
@@ -250,6 +260,7 @@ class StudentService():
             group by s.id,s.name,s.email,s.phone,s.address,s.status,
             g.name
             order by s.created_at desc
+            limit :limit offset :offset
         '''
     )
     get_join_sql = text(
@@ -286,6 +297,7 @@ class StudentService():
             group by s.id,s.name,s.email,s.phone,s.address,s.status,
             g.name
             order by s.created_at desc
+            limit :limit offset :offset
         '''
     )
 
@@ -299,20 +311,28 @@ class StudentService():
                 raise NotFound(f'Student with id={id} Not found')
             return result
 
-    def get_join_query(self, query: str) -> dict:
+    def get_join_query(self, query: str, limit: int, offset: int) -> dict:
         with db.session.begin():
             result = db.session.execute(
                 self.join_query_sql,
-                {"query": f'%{query}%'}
+                {
+                    "query": f'%{query}%',
+                    "limit": limit,
+                    "offset": offset
+                    }
             ).mappings().fetchall()
             if result is None:
                 raise NotFound(f'Student with query={query} Not found')
             return result
 
-    def get_join(self) -> dict:
+    def get_join(self, limit: int, offset: int) -> dict:
         with db.session.begin():
             result = db.session.execute(
                 self.get_join_sql,
+                {
+                    "limit": limit,
+                    "offset": offset
+                }
             ).mappings().all()
             if result is None:
                 raise NotFound('Students Not found')

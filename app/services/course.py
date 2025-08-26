@@ -56,6 +56,7 @@ class CourseService():
     get_all_sql = text(
         '''select * from course
             order by created_at desc
+            limit :limit offset :offset
         '''
     )
     get_query_sql = text(
@@ -63,22 +64,29 @@ class CourseService():
             where name ilike :query
             or description ilike :query
             order by created_at desc
+            limit :limit offset :offset
         '''
     )
 
-    def get_all(self) -> list[dict]:
+    def get_all(self, limit: int, offset: int) -> list[dict]:
         with db.session.begin():
             results = db.session.execute(
-                self.get_all_sql
+                self.get_all_sql,
+                {
+                    "limit": limit,
+                    "offset": offset
+                }
             ).mappings().fetchall()
             return results
 
-    def get_query(self, query: str) -> list[dict]:
+    def get_query(self, query: str, limit: int, offset: int) -> list[dict]:
         with db.session.begin():
             results = db.session.execute(
                 self.get_query_sql,
                 {
-                    "query": f'%{query}%'
+                    "query": f'%{query}%',
+                    "limit": limit,
+                    "offset": offset
                 }
             ).mappings().fetchall()
             return results
@@ -485,6 +493,7 @@ class CourseService():
             group by c.id,c.name,c.description,c.status,c.student_limit,
             c.current_students,c.start_date,c.end_date,c.created_at
             order by c.student_limit desc
+            limit :limit offset :offset
         '''
     )
     join__query_sql = text(
@@ -522,20 +531,29 @@ class CourseService():
             group by c.id,c.name,c.description,c.status,c.student_limit,
             c.current_students,c.start_date,c.end_date,c.created_at
             order by c.student_limit desc
+            limit :limit offset :offset
         '''
     )
 
-    def get_join(self) -> list[dict]:
+    def get_join(self, limit: int, offset: int) -> list[dict]:
         with db.session.begin():
             results = db.session.execute(
-                self.get_join_sql
+                self.get_join_sql,
+                {
+                    "limit": limit,
+                    "offset": offset
+                }
             ).mappings().fetchall()
             return results
 
-    def join_query(self, query: str) -> list[dict]:
+    def join_query(self, query: str, limit: int, offset: int) -> list[dict]:
         with db.session.begin():
             results = db.session.execute(
                 self.join__query_sql,
-                {"query": f'%{query}%'}
+                {
+                    "query": f'%{query}%',
+                    "limit": limit,
+                    "offset": offset
+                    }
             ).mappings().fetchall()
             return results

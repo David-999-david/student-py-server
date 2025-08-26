@@ -42,13 +42,20 @@ def insert_more():
 @course_bp.route('', methods=['GET'])
 def get():
     query = request.args.get('q', '').strip()
+    page = request.args.get('p', default=1, type=int)
+    limit = request.args.get('l', default=20, type=int)
+    if page is None or page < 1:
+        page = 1
+    if limit is None or limit < 1:
+        limit = 20
+    offset = (page - 1) * limit
     if query:
-        results = CourseService().get_query(query=query)
+        results = CourseService().get_query(query=query, limit=limit, offset=offset)
         courses = [
             seralize_dict(dict(c)) for c in results
         ]
     else:
-        results = CourseService().get_all()
+        results = CourseService().get_all(limit=limit, offset=offset)
         courses = [
             seralize_dict(dict(c)) for c in results
         ]
@@ -137,6 +144,13 @@ def cancel_join():
 @limiter.limit('10 per minute')
 def get_join(id):
     query = request.args.get('q', '').strip()
+    page = request.args.get('p', default=1, type=int)
+    limit = request.args.get('l', default=10, type=int)
+    if page is None or page < 1:
+        page = 1
+    if limit is None or limit < 1:
+        page = 10
+    offset = (page - 1) * limit
     if id:
         result = CourseService().get_id(id=id)
         return jsonify({
@@ -145,12 +159,12 @@ def get_join(id):
             "data": seralize_dict(dict(result))
         })
     elif query:
-        results = CourseService().join_query(query=query)
+        results = CourseService().join_query(query=query, limit=limit, offset=offset)
         courses = [
             seralize_dict(dict(c)) for c in results
         ]
     else:
-        results = CourseService().get_join()
+        results = CourseService().get_join(limit=limit, offset=offset)
         courses = [
             seralize_dict(dict(c)) for c in results
         ]

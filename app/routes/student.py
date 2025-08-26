@@ -55,25 +55,32 @@ def insert_more():
     }), 201
 
 
-# @student_bp.route('', methods=['GET'])
-# def get_stu():
-#     query = request.args.get('q', '').strip()
-#     if query:
-#         results = StudentService().get_query(query=query)
-#         students = [
-#             seralize_dict(dict(s)) for s in results
-#         ]
-#     else:
-#         results = StudentService().get()
-#         students = [
-#             seralize_dict(dict(s)) for s in results
-#         ]
-#     return jsonify({
-#         "error": False,
-#         "success": True,
-#         "data": students,
-#         "count": len(students)
-#     }), 200
+@student_bp.route('', methods=['GET'])
+def get_stu():
+    query = request.args.get('q', '').strip()
+    page = request.args.get('p', default=1, type=int)
+    limit = request.args.get('l', default=10, type=int)
+    if page is None or page < 1:
+        page = 1
+    if limit is None or limit < 1:
+        limit = 10
+    offset = (page - 1) * limit
+    if query:
+        results = StudentService().get_query(query=query, limit=limit, offset=offset)
+        students = [
+            seralize_dict(dict(s)) for s in results
+        ]
+    else:
+        results = StudentService().get(limit=limit, offset=offset)
+        students = [
+            seralize_dict(dict(s)) for s in results
+        ]
+    return jsonify({
+        "error": False,
+        "success": True,
+        "data": students,
+        "count": len(students)
+    }), 200
 
 
 @student_bp.route('/<int:id>', methods=['PUT'])
@@ -105,10 +112,17 @@ def remove(id):
     }), 200
 
 
-@student_bp.route('', defaults={"id": None}, methods=['GET'])
-@student_bp.route('/<int:id>', methods=['GET'])
+@student_bp.route('/join', defaults={"id": None}, methods=['GET'])
+@student_bp.route('/join/<int:id>', methods=['GET'])
 def get_id(id):
     query = request.args.get('q', '').strip()
+    page = request.args.get('p', default=1, type=int)
+    limit = request.args.get('l', default=10, type=int)
+    if page is None or page < 1:
+        page = 1
+    if limit is None or limit < 1:
+        limit = 10
+    offset = (page - 1) * limit
     if id:
         results = StudentService().get_id(id)
         students = seralize_dict(dict(results))
@@ -118,12 +132,12 @@ def get_id(id):
             "data": students,
         }), 200
     elif query:
-        results = StudentService().get_join_query(query=query)
+        results = StudentService().get_join_query(query=query, limit=limit, offset=offset)
         students = [
             seralize_dict(dict(s)) for s in results
         ]
     else:
-        results = StudentService().get_join()
+        results = StudentService().get_join(limit=limit, offset=offset)
         students = [
             seralize_dict(dict(s)) for s in results
         ]
