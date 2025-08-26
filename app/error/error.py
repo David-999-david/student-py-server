@@ -2,9 +2,23 @@ from werkzeug.exceptions import HTTPException
 from marshmallow.exceptions import ValidationError
 from flask import jsonify, current_app
 from sqlalchemy.exc import IntegrityError, DatabaseError
+from flask_limiter.errors import RateLimitExceeded
 
 
 def register_app_error(app):
+
+    @app.errorhandler(RateLimitExceeded)
+    def on_rateLimit(e):
+        resp = jsonify({
+            "error": "Too many request",
+            "detail": str(e)
+        })
+        resp.status_code = 429
+        try:
+            resp.headers.extend(e.get_headers())
+        except Exception:
+            pass
+        return resp
 
     @app.errorhandler(ValidationError)
     def on_validate(e):

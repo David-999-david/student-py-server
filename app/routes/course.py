@@ -3,6 +3,7 @@ from app.schema.course import CourseSchema
 from app.services.course import CourseService
 from app.seralizer import seralize_dict
 from app.schema.student import bulkSchema
+from app.extensions import limiter
 
 
 course_bp = Blueprint('course', __name__, url_prefix='/course')
@@ -129,3 +130,33 @@ def cancel_join():
         "success": True,
         "data": result['detail']
     }), result['status']
+
+
+@course_bp.route('/join', defaults={"id": None}, methods=['GET'])
+@course_bp.route('/join/<int:id>', methods=['GET'])
+@limiter.limit('10 per minute')
+def get_join(id):
+    query = request.args.get('q', '').strip()
+    if id:
+        result = CourseService().get_id(id=id)
+        return jsonify({
+            "error": False,
+            "success": True,
+            "data": seralize_dict(dict(result))
+        })
+    elif query:
+        results = CourseService().join_query(query=query)
+        courses = [
+            seralize_dict(dict(c)) for c in results
+        ]
+    else:
+        results = CourseService().get_join()
+        courses = [
+            seralize_dict(dict(c)) for c in results
+        ]
+    return jsonify({
+        "error": False,
+        "success": True,
+        "data": courses,
+        "count": len(courses)
+    })

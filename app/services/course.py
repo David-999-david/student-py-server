@@ -386,86 +386,6 @@ class CourseService():
                 "data": result
             }
 
-    # def joins(self, courseId: int, studentIds: list[int]):
-    #     result = {
-    #         "skip": [],
-    #         "join": [],
-    #         "course_Full": False
-    #     }
-    #     with db.session.begin():
-    #         for sid in studentIds:
-    #             check_limit = db.session.execute(
-    #                 self.limit_sql,
-    #                 {"cid": courseId}
-    #             ).mappings().fetchone()
-    #             limit = check_limit['student_limit']
-    #             current = check_limit['current_students']
-    #             cour_status = check_limit['status']
-    #             if not cour_status:
-    #                 return {
-    #                     "error": True,
-    #                     "status": 403,
-    #                     "detail": f'Course with id={courseId}'
-    #                               ' status Inactive'
-    #                 }
-    #             if current >= limit:
-    #                 result["course_Full"] = True
-    #                 return {
-    #                     "error": False,
-    #                     "status": 200,
-    #                     "message": f'Course id={courseId} limit reach',
-    #                     "data": result
-    #                 }
-    #             exist = db.session.execute(
-    #                 self.exist_sql,
-    #                 {
-    #                     "sid": sid,
-    #                     "cid": courseId
-    #                 }
-    #             ).scalar()
-    #             if exist is not None:
-    #                 result['skip'].append(
-    #                     {"sid": sid,
-    #                      "reason": f"Sid {sid} already join with Cid"
-    #                      f"{courseId}"
-    #                      }
-    #                 )
-    #                 continue
-    #             stu_status = db.session.execute(
-    #                 self.stud_status,
-    #                 {"sid": sid}
-    #             ).scalar()
-    #             if not stu_status:
-    #                 result["skip"].append(
-    #                     {
-    #                         "sid": sid,
-    #                         "reason": f"Sid {sid} is Inactive"
-    #                     }
-    #                 )
-    #                 continue
-    #             join = db.session.execute(
-    #                 self.join_sql,
-    #                 {
-    #                     "sid": sid,
-    #                     "cid": courseId
-    #                 }
-    #             ).scalar()
-    #             if join:
-    #                 result['join'].append(
-    #                     {
-    #                         "sid": sid,
-    #                         "reason": f'Sid {sid} joined'
-    #                     }
-    #                 )
-    #                 db.session.execute(
-    #                     self.inc_sql,
-    #                     {
-    #                         "n": 1,
-    #                         "cid": courseId
-    #                     }
-    #                 )
-    #         return {"error": False, "status": 200, "data": result}
-
     check_sql = text(
         '''select 1 from
             student_course
@@ -533,3 +453,89 @@ class CourseService():
                 "detail": f'Cancel join course id={courseId} with student id={studentId}'
                           'success'
             }
+    get_join_sql = text(
+        '''select
+            c.id as "courseId",
+            c.name,
+            c.description,
+            c.status,
+            c.student_limit,
+            c.current_students,
+            c.start_date,
+            c.end_date,
+            c.created_at,
+            coalesce(
+            jsonb_agg(
+            jsonb_build_object(
+            'id',s.id,
+            'name',s.name,
+            'email',s.email,
+            'address',s.address,
+            'phone',s.phone,
+            'status',s.status,
+            'gender',g.name
+            )
+            ) filter (where s.id is not null),
+            '[]'::jsonb
+            ) as students
+            from course c
+            left join student_course sc on sc.course_id = c.id
+            left join student s on s.id = sc.student_id
+            left join gender g on g.id = s.gender_id
+            group by c.id,c.name,c.description,c.status,c.student_limit,
+            c.current_students,c.start_date,c.end_date,c.created_at
+            order by c.student_limit desc
+        '''
+    )
+    join__query_sql = text(
+        '''select
+            c.id as "courseId",
+            c.name,
+            c.description,
+            c.status,
+            c.student_limit,
+            c.current_students,
+            c.start_date,
+            c.end_date,
+            c.created_at,
+            coalesce(
+            jsonb_agg(
+            jsonb_build_object(
+            'id',s.id,
+            'name',s.name,
+            'email',s.email,
+            'address',s.address,
+            'phone',s.phone,
+            'status',s.status,
+            'gender',g.name
+            )
+            ) filter (where s.id is not null),
+            '[]'::jsonb
+            ) as students
+            from course c
+            left join student_course sc on sc.course_id = c.id
+            left join student s on s.id = sc.student_id
+            left join gender g on g.id = s.gender_id
+            where c.name ilike :query or
+            cast(c.student_limit as text) ilike :query or
+            cast(c.current_students as text) ilike :query
+            group by c.id,c.name,c.description,c.status,c.student_limit,
+            c.current_students,c.start_date,c.end_date,c.created_at
+            order by c.student_limit desc
+        '''
+    )
+
+    def get_join(self) -> list[dict]:
+        with db.session.begin():
+            results = db.session.execute(
+                self.get_join_sql
+            ).mappings().fetchall()
+            return results
+
+    def join_query(self, query: str) -> list[dict]:
+        with db.session.begin():
+            results = db.session.execute(
+                self.join__query_sql,
+                {"query": f'%{query}%'}
+            ).mappings().fetchall()
+            return results
